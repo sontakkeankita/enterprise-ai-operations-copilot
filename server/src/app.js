@@ -7,6 +7,8 @@ import healthRoutes from "./routes/healthRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
+import agentRoutes from "./routes/agentRoutes.js";
 
 const app = express();
 
@@ -31,6 +33,8 @@ app.use("/api/auth", authRoutes);
 // User APIs
 app.use("/api/users", userRoutes);
 app.use("/api/documents", documentRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/agent", agentRoutes);
 // Default route
 app.get("/", (req, res) => {
 
