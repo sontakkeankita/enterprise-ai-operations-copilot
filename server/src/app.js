@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import healthRoutes from "./routes/healthRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import documentRoutes from "./routes/documentRoutes.js";
 
 const app = express();
 
@@ -29,7 +30,7 @@ app.use("/api/auth", authRoutes);
 
 // User APIs
 app.use("/api/users", userRoutes);
-
+app.use("/api/documents", documentRoutes);
 // Default route
 app.get("/", (req, res) => {
 
@@ -45,6 +46,34 @@ app.use((req, res) => {
     message: "API route not found"
   });
 
+});
+
+app.use((err, req, res, next) => {
+  console.error("API error:", err.message);
+
+  if (err.name === "MulterError") {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        message: "File size cannot exceed 10 MB",
+      });
+    }
+
+    return res.status(400).json({
+      message: err.message,
+    });
+  }
+
+  if (
+    err.message === "Only PDF and TXT files are allowed"
+  ) {
+    return res.status(400).json({
+      message: err.message,
+    });
+  }
+
+  return res.status(500).json({
+    message: "Something went wrong on the server",
+  });
 });
 
 export default app;

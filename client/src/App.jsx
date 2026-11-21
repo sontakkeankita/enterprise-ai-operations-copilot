@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiRequest } from "./services/api";
 
 import "./App.css";
+import Documents from "./components/Documents";
 
 function App() {
 
@@ -183,7 +184,7 @@ function App() {
           )}
 
           {error && <p className="error">{error}</p>}
-
+            <Documents />
           <button
             className="logout-button"
             onClick={handleLogout}
