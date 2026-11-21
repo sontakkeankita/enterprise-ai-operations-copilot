@@ -36,6 +36,22 @@ const documentChunkSchema = new mongoose.Schema(
         required: true,
       },
     },
+
+    // Phase 4: embedding fields
+    embedding: {
+      type: [Number],
+      default: undefined,
+    },
+
+    embeddingModel: {
+      type: String,
+      default: null,
+    },
+
+    embeddingDimensions: {
+      type: Number,
+      default: null,
+    },
   },
   {
     timestamps: true,

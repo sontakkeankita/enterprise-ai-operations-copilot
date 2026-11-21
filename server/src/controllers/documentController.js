@@ -6,6 +6,7 @@ import DocumentChunk from "../models/DocumentChunk.js";
 
 import { extractText } from "../services/documents/textExtractor.js";
 import { splitIntoChunks } from "../services/documents/chunkingService.js";
+import { embedDocumentChunks } from "../services/embeddings/documentEmbeddingService.js";
 
 // Decide which documents a user is allowed to see.
 const getAccessFilter = (user) => {
@@ -115,24 +116,29 @@ export const uploadDocument = async (req, res) => {
 
     // Save chunks in MongoDB.
     await DocumentChunk.insertMany(chunkRecords);
-
+    const embeddingResult = await embedDocumentChunks(document._id);
+    
     // Mark processing as complete.
     document.status = "completed";
     document.chunkCount = chunks.length;
 
     await document.save();
 
-    return res.status(201).json({
-      message: "Document uploaded and processed successfully",
-      document: {
-        id: document._id,
-        originalName: document.originalName,
-        department: document.department,
-        status: document.status,
-        chunkCount: document.chunkCount,
-        extractedTextLength: document.extractedTextLength,
-      },
-    });
+   return res.status(201).json({
+  message: "Document uploaded and processed successfully",
+  document: {
+    id: document._id,
+    originalName: document.originalName,
+    department: document.department,
+    status: "completed",
+    chunkCount: chunks.length,
+    extractedTextLength: document.extractedTextLength,
+
+    embeddingStatus: "completed",
+    embeddedChunkCount: embeddingResult.embeddedChunkCount,
+    embeddingModel: embeddingResult.embeddingModel,
+  },
+});
   } catch (error) {
     console.error("Document upload error:", error);
 
@@ -241,3 +247,40 @@ export const deleteDocument = async (req, res) => {
     });
   }
 };
+
+export const generateDocumentEmbeddings = async (req, res) => {
+  try {
+    // Verify that this document is accessible to the user.
+    const document = await Document.findOne({
+      _id: req.params.id,
+      ...getAccessFilter(req.user),
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        message: "Document not found",
+      });
+    }
+
+    if (document.status !== "completed") {
+      return res.status(400).json({
+        message: "Document ingestion must finish first",
+      });
+    }
+
+    const result = await embedDocumentChunks(document._id);
+
+    return res.status(200).json({
+      message: "Document embeddings generated successfully",
+      documentId: document._id,
+      ...result,
+    });
+  } catch (error) {
+    console.error("Embedding generation error:", error);
+
+    return res.status(500).json({
+      message: "Could not generate document embeddings",
+    });
+  }
+};
+

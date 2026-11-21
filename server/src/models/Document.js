@@ -46,7 +46,23 @@ const documentSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    embeddingStatus: {
+  type: String,
+  enum: ["pending", "processing", "completed", "failed"],
+  default: "pending",
+},
+
+embeddedChunkCount: {
+  type: Number,
+  default: 0,
+},
+
+embeddingModel: {
+  type: String,
+  default: null,
+},
   },
+  
   {
     timestamps: true,
   }
