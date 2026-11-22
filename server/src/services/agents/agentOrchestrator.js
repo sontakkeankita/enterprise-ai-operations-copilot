@@ -8,120 +8,175 @@ import {
 } from "./plannerService.js";
 
 import {
+  getAvailableTools,
   executeTool,
 } from "./toolRegistry.js";
 
-const ALLOWED_TOOLS_BY_INTENT = {
-  knowledge_question: [
-    "search_company_knowledge",
-  ],
+import {
+  connectMcpServers,
+  discoverMcpCapabilities,
+} from "../mcp/mcpClientService.js";
 
-  action_request: [
-    "prepare_task",
-    "prepare_hr_request",
-  ],
+const ACTION_TOOLS = [
+  "create_task",
+  "get_task",
+  "update_task",
+  "list_tasks",
+  "create_leave_request",
+  "get_employee_details",
+  "get_leave_balance",
+];
 
-  mixed_request: [
-    "search_company_knowledge",
-    "prepare_task",
-    "prepare_hr_request",
-  ],
+const getAllowedTools = (intent) => {
+  if (intent === "knowledge_question") {
+    return ["search_company_knowledge"];
+  }
+
+  if (intent === "action_request") {
+    return ACTION_TOOLS;
+  }
+
+  if (intent === "mixed_request") {
+    return [
+      "search_company_knowledge",
+      ...ACTION_TOOLS,
+    ];
+  }
+
+  return [];
 };
 
 export const runAgent = async ({
   question,
   user,
 }) => {
-  // Step 1: Detect intent
-  const detected = await detectIntent(question);
+  let mcpClients = null;
 
-  if (detected.intent === "general_conversation") {
-    return {
+  try {
+    // Step 1: Detect intent
+    const detected = await detectIntent(question);
+
+    if (detected.intent === "general_conversation") {
+      return {
+        intent: detected.intent,
+        message:
+          "Hello! I can help you search company documents, prepare tasks and prepare HR requests.",
+        plan: [],
+        results: [],
+      };
+    }
+
+    if (detected.intent === "unsupported") {
+      return {
+        intent: detected.intent,
+        message:
+          "This request is outside the current capabilities of the Enterprise AI Copilot.",
+        plan: [],
+        results: [],
+      };
+    }
+
+    // Step 2: Connect MCP servers only when required
+    let capabilities = null;
+
+    if (
+      detected.intent === "action_request" ||
+      detected.intent === "mixed_request"
+    ) {
+      mcpClients = await connectMcpServers(user);
+
+      capabilities =
+        await discoverMcpCapabilities(mcpClients);
+    }
+
+    // Step 3: Get available tools
+    const availableTools =
+      getAvailableTools(capabilities);
+
+    // Step 4: Create plan
+    const plan = await createAgentPlan({
+      question,
       intent: detected.intent,
-      message:
-        "Hello! I can help you search company documents, prepare tasks, and prepare HR requests.",
-      plan: [],
-      results: [],
-    };
-  }
+      availableTools,
+    });
 
-  if (detected.intent === "unsupported") {
-    return {
-      intent: detected.intent,
-      message:
-        "This request is outside the current capabilities of the Enterprise AI Copilot.",
-      plan: [],
-      results: [],
-    };
-  }
+    if (
+      plan.needsClarification ||
+      plan.steps.length === 0
+    ) {
+      return {
+        intent: detected.intent,
+        message:
+          plan.needsClarification ||
+          "Please provide more information.",
+        plan: [],
+        results: [],
+      };
+    }
 
-  // Step 2: Create plan
-  const plan = await createAgentPlan({
-    question,
-    intent: detected.intent,
-  });
+    // Step 5: Validate tools against intent
+    const allowedTools = new Set(
+      getAllowedTools(detected.intent)
+    );
 
-  if (plan.needsClarification || plan.steps.length === 0) {
-    return {
-      intent: detected.intent,
-      message:
-        plan.needsClarification ||
-        "Please provide more information so I can prepare the correct plan.",
-      plan: [],
-      results: [],
-    };
-  }
+    for (const step of plan.steps) {
+      if (!allowedTools.has(step.toolName)) {
+        throw new Error(
+          `Tool ${step.toolName} is not allowed for this intent`
+        );
+      }
+    }
 
-  // Step 3: Validate tools allowed for this intent
-  const allowedTools =
-    ALLOWED_TOOLS_BY_INTENT[detected.intent];
+    // Step 6: Execute tools sequentially
+    const results = [];
 
-  if (!allowedTools) {
-    throw new Error("Unsupported agent intent");
-  }
+    for (const step of plan.steps) {
+      try {
+        const result = await executeTool(
+          step.toolName,
+          step.arguments,
+          user,
+          mcpClients
+        );
 
-  for (const step of plan.steps) {
-    if (!allowedTools.includes(step.toolName)) {
-      throw new Error(
-        `Tool ${step.toolName} is not allowed for this intent`
-      );
+        results.push({
+          toolName: step.toolName,
+          status: "success",
+          result,
+        });
+
+      } catch (error) {
+        results.push({
+          toolName: step.toolName,
+          status: "failed",
+          error: error.message,
+        });
+
+        break;
+      }
+    }
+
+    const awaitingApproval = results.some(
+  ({ result }) =>
+    result?.approval?.status === "PENDING"
+);
+
+return {
+  intent: detected.intent,
+  summary: detected.summary,
+
+  message: awaitingApproval
+    ? "Your request has been submitted successfully and is waiting for admin approval."
+    : "Agent execution completed.",
+
+  plan: plan.steps,
+  results,
+};
+
+  } finally {
+    // Always close the child processes.
+    if (mcpClients) {
+      await mcpClients.close();
     }
   }
-
-  // Step 4: Execute tools sequentially
-  const results = [];
-
-  for (const step of plan.steps) {
-    try {
-      const result = await executeTool(
-        step.toolName,
-        step.arguments,
-        user
-      );
-
-      results.push({
-        toolName: step.toolName,
-        status: "success",
-        result,
-      });
-    } catch (error) {
-      results.push({
-        toolName: step.toolName,
-        status: "failed",
-        error: error.message,
-      });
-
-      // Stop if a step fails.
-      break;
-    }
-  }
-
-  // Step 5: Return the agent result
-  return {
-    intent: detected.intent,
-    summary: detected.summary,
-    message: "Agent execution completed.",
-    plan: plan.steps,
-    results,
-  };
 };

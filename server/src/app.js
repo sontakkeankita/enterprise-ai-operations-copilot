@@ -9,6 +9,8 @@ import userRoutes from "./routes/userRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import agentRoutes from "./routes/agentRoutes.js";
+import mcpRoutes from "./routes/mcpRoutes.js";
+import approvalRoutes from "./routes/approvalRoutes.js";
 
 const app = express();
 
@@ -35,6 +37,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/agent", agentRoutes);
+app.use("/api/mcp", mcpRoutes);
+app.use("/api/approvals", approvalRoutes);
 // Default route
 app.get("/", (req, res) => {
 
