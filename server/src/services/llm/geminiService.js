@@ -137,8 +137,22 @@ your statements.
     throw new Error("Gemini returned an empty response");
   }
 
-  return {
-    answer,
-    model: GEMINI_CHAT_MODEL,
-  };
+  const usage = response.usageMetadata;
+
+return {
+  answer,
+
+  model: GEMINI_CHAT_MODEL,
+
+  tokenUsage: {
+    promptTokens:
+      usage?.promptTokenCount ?? null,
+
+    completionTokens:
+      usage?.candidatesTokenCount ?? null,
+
+    totalTokens:
+      usage?.totalTokenCount ?? null,
+  },
+};
 };

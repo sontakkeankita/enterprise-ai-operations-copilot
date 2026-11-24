@@ -11,6 +11,15 @@ import {
   generateRagAnswer,
 } from "../llm/geminiService.js";
 
+import {
+  measureExecutionTime,
+} from "../evaluation/performanceMetrics.js";
+
+import {
+  logInfo,
+  logError,
+} from "../evaluation/logger.js";
+
 const NO_INFORMATION_MESSAGE =
   "I could not find relevant information in the available company documents to answer your question. Please contact the appropriate department for clarification.";
 
@@ -47,53 +56,88 @@ export const answerWithRag = async ({
   user,
   limit = 5,
 }) => {
-  // Step 1: Retrieve relevant chunks.
-  const chunks = await hybridSearch(
-    question,
-    user,
-    limit
-  );
+  try {
+    // Step 1: Retrieve relevant chunks.
+    const chunks = await hybridSearch(
+      question,
+      user,
+      limit
+    );
 
-  // Step 2: Do not ask Gemini if nothing was retrieved.
-  if (!chunks.length) {
+    // Step 2: Do not ask Gemini if nothing was retrieved.
+    if (!chunks.length) {
+      return {
+        answer: NO_INFORMATION_MESSAGE,
+        sources: [],
+        citationIds: [],
+        retrieval: {
+          method: "hybrid",
+          resultCount: 0,
+        },
+        model: null,
+      };
+    }
+
+    // Step 3: Build context and source references.
+    const {
+      context,
+      sources,
+    } = buildCitedContext(chunks);
+
+    // Step 4: Generate the answer using Gemini
+    // and measure execution time.
+    const measurement = await measureExecutionTime(
+      () =>
+        generateRagAnswer({
+          question,
+          context,
+        })
+    );
+
+    if (!measurement.success) {
+      throw measurement.error;
+    }
+
+    const result = measurement.result;
+
+    const durationMs = measurement.durationMs;
+
+    // Step 5: Structured success logging.
+    logInfo("RAG answer generated", {
+      durationMs,
+      model: result.model,
+      totalTokens: result.tokenUsage?.totalTokens,
+    });
+
+    // Step 6: Validate citation identifiers.
+    const validated = validateCitations(
+      result.answer,
+      sources
+    );
+
+    // Step 7: Return the final RAG response.
     return {
-      answer: NO_INFORMATION_MESSAGE,
-      sources: [],
-      citationIds: [],
+      answer: validated.answer,
+      sources,
+      citationIds: validated.citationIds,
       retrieval: {
         method: "hybrid",
-        resultCount: 0,
+        resultCount: chunks.length,
       },
-      model: null,
+      model: result.model,
+      tokenUsage: result.tokenUsage,
+      performance: {
+        durationMs,
+      },
     };
+
+  } catch (error) {
+    // Log failures without exposing document context
+    // or credentials.
+    logError("RAG answer generation failed", {
+      error: error.message,
+    });
+
+    throw error;
   }
-
-  // Step 3: Build context and source references.
-  const {
-    context,
-    sources,
-  } = buildCitedContext(chunks);
-
-  // Step 4: Generate the answer using Gemini.
-  const generated = await generateRagAnswer({
-    question,
-    context,
-  });
-
-  // Step 5: Validate the citation identifiers.
-  const validated = validateCitations(
-    generated.answer,
-    sources
-  );
-
-  return {
-    answer: validated.answer,
-    sources,
-    citationIds: validated.citationIds,
-    retrieval: {
-      method: "hybrid",
-      resultCount: chunks.length,
-    },
-    model: generated.model,
-  };
 };

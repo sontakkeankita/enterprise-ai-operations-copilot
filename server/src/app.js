@@ -11,6 +11,7 @@ import chatRoutes from "./routes/chatRoutes.js";
 import agentRoutes from "./routes/agentRoutes.js";
 import mcpRoutes from "./routes/mcpRoutes.js";
 import approvalRoutes from "./routes/approvalRoutes.js";
+import evaluationRoutes from "./routes/evaluationRoutes.js";
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/agent", agentRoutes);
 app.use("/api/mcp", mcpRoutes);
 app.use("/api/approvals", approvalRoutes);
+app.use("/api/evaluations", evaluationRoutes);
 // Default route
 app.get("/", (req, res) => {
 

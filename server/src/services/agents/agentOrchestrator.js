@@ -52,9 +52,17 @@ export const runAgent = async ({
 }) => {
   let mcpClients = null;
 
+  // Actual execution metrics.
+  let actualIntent = null;
+  let actualTool = null;
+  let toolExecuted = false;
+  let toolSucceeded = false;
+
   try {
-    // Step 1: Detect intent
+    // Step 1: Detect intent.
     const detected = await detectIntent(question);
+
+    actualIntent = detected.intent;
 
     if (detected.intent === "general_conversation") {
       return {
@@ -63,6 +71,11 @@ export const runAgent = async ({
           "Hello! I can help you search company documents, prepare tasks and prepare HR requests.",
         plan: [],
         results: [],
+
+        actualIntent,
+        actualTool: null,
+        toolExecuted: false,
+        toolSucceeded: false,
       };
     }
 
@@ -73,10 +86,15 @@ export const runAgent = async ({
           "This request is outside the current capabilities of the Enterprise AI Copilot.",
         plan: [],
         results: [],
+
+        actualIntent,
+        actualTool: null,
+        toolExecuted: false,
+        toolSucceeded: false,
       };
     }
 
-    // Step 2: Connect MCP servers only when required
+    // Step 2: Connect MCP servers only when required.
     let capabilities = null;
 
     if (
@@ -89,11 +107,11 @@ export const runAgent = async ({
         await discoverMcpCapabilities(mcpClients);
     }
 
-    // Step 3: Get available tools
+    // Step 3: Get available tools.
     const availableTools =
       getAvailableTools(capabilities);
 
-    // Step 4: Create plan
+    // Step 4: Create plan.
     const plan = await createAgentPlan({
       question,
       intent: detected.intent,
@@ -111,10 +129,15 @@ export const runAgent = async ({
           "Please provide more information.",
         plan: [],
         results: [],
+
+        actualIntent,
+        actualTool: null,
+        toolExecuted: false,
+        toolSucceeded: false,
       };
     }
 
-    // Step 5: Validate tools against intent
+    // Step 5: Validate tools against intent.
     const allowedTools = new Set(
       getAllowedTools(detected.intent)
     );
@@ -127,11 +150,19 @@ export const runAgent = async ({
       }
     }
 
-    // Step 6: Execute tools sequentially
+    // Step 6: Execute tools sequentially.
     const results = [];
 
     for (const step of plan.steps) {
+      // Capture the actual selected tool.
+      if (!actualTool) {
+        actualTool = step.toolName;
+      }
+
       try {
+        // Tool execution was attempted.
+        toolExecuted = true;
+
         const result = await executeTool(
           step.toolName,
           step.arguments,
@@ -156,22 +187,40 @@ export const runAgent = async ({
       }
     }
 
+    // Step 7: Determine execution success.
+    // Success is based on executeTool completing
+    // without throwing an error.
+    toolSucceeded =
+      toolExecuted &&
+      results.length > 0 &&
+      results.every(
+        (item) => item.status === "success"
+      );
+
+    // Step 8: Check approval status.
     const awaitingApproval = results.some(
-  ({ result }) =>
-    result?.approval?.status === "PENDING"
-);
+      ({ result }) =>
+        result?.approval?.status === "PENDING"
+    );
 
-return {
-  intent: detected.intent,
-  summary: detected.summary,
+    // Step 9: Return agent execution and evaluation data.
+    return {
+      intent: detected.intent,
+      summary: detected.summary,
 
-  message: awaitingApproval
-    ? "Your request has been submitted successfully and is waiting for admin approval."
-    : "Agent execution completed.",
+      message: awaitingApproval
+        ? "Your request has been submitted successfully and is waiting for admin approval."
+        : "Agent execution completed.",
 
-  plan: plan.steps,
-  results,
-};
+      plan: plan.steps,
+      results,
+
+      // Actual evaluation metrics.
+      actualIntent,
+      actualTool,
+      toolExecuted,
+      toolSucceeded,
+    };
 
   } finally {
     // Always close the child processes.

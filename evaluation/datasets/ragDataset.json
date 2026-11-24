@@ -1,0 +1,34 @@
+
+[
+  {
+    "id": "RAG001",
+    "question": "What are the responsibilities of employees working remotely?",
+    "expectedAnswer": "Employees should follow agreed working hours, remain reachable, attend scheduled meetings, and protect company information.",
+    "expectedKeywords": [
+      "working hours",
+      "reachable",
+      "meetings",
+      "company information"
+    ],
+    "expectedSource": "sample_work_from_home_policy.pdf"
+  },
+  {
+    "id": "RAG002",
+    "question": "How should employees protect company information while working remotely?",
+    "expectedAnswer": "Employees should use approved devices, applications, networks, and storage locations, protect devices with passwords, and avoid unauthorized sharing.",
+    "expectedKeywords": [
+      "approved devices",
+      "networks",
+      "password",
+      "unauthorized"
+    ],
+    "expectedSource": "sample_work_from_home_policy.pdf"
+  },
+  {
+    "id": "RAG003",
+    "question": "What is the company's office relocation policy?",
+    "expectedAnswer": "The available documents do not contain enough information to answer this question.",
+    "expectedKeywords": [],
+    "expectedSource": null
+  }
+]

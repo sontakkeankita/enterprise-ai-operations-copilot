@@ -1,0 +1,27 @@
+
+[
+  {
+    "id": "AGENT001",
+    "question": "Create a task for the IT department to fix the login issue.",
+    "expectedIntent": "create_task",
+    "expectedTool": "create_task"
+  },
+  {
+    "id": "AGENT002",
+    "question": "I want to apply for five days of leave.",
+    "expectedIntent": "create_leave_request",
+    "expectedTool": "create_leave_request"
+  },
+  {
+    "id": "AGENT003",
+    "question": "Hello, how are you?",
+    "expectedIntent": "general_conversation",
+    "expectedTool": null
+  },
+  {
+    "id": "AGENT004",
+    "question": "What is our work from home policy?",
+    "expectedIntent": "document_question",
+    "expectedTool": null
+  }
+]
